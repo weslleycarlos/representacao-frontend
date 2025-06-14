@@ -8,9 +8,9 @@ import OrdersPage from './components/OrdersPage';
 import { useServiceWorker } from './hooks/useOffline';
 import { Loader2 } from 'lucide-react';
 import './App.css';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 const AppContent = () => {
+  const [currentPage, setCurrentPage] = useState('dashboard');
   const { user, company, loading } = useAuth();
 
   // Registra o service worker
@@ -24,29 +24,32 @@ const AppContent = () => {
     );
   }
 
+  // Se não está logado, mostra a página de login
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  // Se está logado mas não selecionou empresa, mostra seleção de empresa
+  if (!company) {
+    return <CompanySelection />;
+  }
+
+  // Renderiza a página atual
+  const renderCurrentPage = () => {
+    switch (currentPage) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'orders':
+        return <OrdersPage />;
+      default:
+        return <Dashboard />;
+    }
+  };
+
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/" />} />
-        <Route path="/select-company" element={user && !company ? <CompanySelection /> : <Navigate to="/" />} />
-        
-        <Route 
-          path="/*" 
-          element={user && company ? (
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/orders" element={<OrdersPage />} />
-                {/* Adicione outras rotas aqui conforme necessário */}
-                <Route path="*" element={<Navigate to="/" />} /> {/* Redireciona para o dashboard se a rota não for encontrada */}
-              </Routes>
-            </Layout>
-          ) : (
-            <Navigate to={user ? "/select-company" : "/login"} />
-          )}
-        />
-      </Routes>
-    </Router>
+    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+      {renderCurrentPage()}
+    </Layout>
   );
 };
 
@@ -59,3 +62,4 @@ function App() {
 }
 
 export default App;
+
