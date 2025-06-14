@@ -22,11 +22,15 @@ const router = createBrowserRouter([
     element: <ProtectedLayout />,
     children: [
       {
-        path: '/', // Rota inicial após o login
+        // AQUI ESTÁ A CORREÇÃO PRINCIPAL:
+        // "index: true" define esta como a rota padrão para o caminho do pai ('/').
+        // Isso remove a ambiguidade do "path: '/'".
+        index: true,
         element: <Dashboard />,
       },
       {
-        path: '/roteiro',
+        // O caminho da rota filha é relativo ao pai, então não usamos a barra '/'.
+        path: 'roteiro',
         element: <OrdersPage />,
       },
       // Adicione aqui outras rotas protegidas que você venha a criar
