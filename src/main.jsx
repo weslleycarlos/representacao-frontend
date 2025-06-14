@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-
 import { AuthProvider } from './contexts/AuthContext';
 import LoginPage from './components/LoginPage';
 import ProtectedLayout from './components/ProtectedLayout';

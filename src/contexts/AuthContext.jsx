@@ -1,3 +1,4 @@
+// src/contexts/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../lib/api';
 
@@ -23,20 +24,24 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuth = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
       const response = await authService.getCurrentUser();
       setUser(response.user);
       setCompany(response.company);
-      
-      // Se não há empresa selecionada, busca as empresas disponíveis
-      if (!response.company) {
-        // Aqui você pode implementar uma chamada para buscar as empresas do usuário
-        // Por enquanto, vamos assumir que as empresas vêm no login
-      }
+      setCompanies(response.companies || []);
     } catch (error) {
       console.error('Erro ao verificar autenticação:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token'); // Remove token inválido
+      }
       setUser(null);
       setCompany(null);
+      setCompanies([]);
     } finally {
       setLoading(false);
     }
@@ -51,6 +56,8 @@ export const AuthProvider = ({ children }) => {
       // Se há apenas uma empresa, seleciona automaticamente
       if (response.companies && response.companies.length === 1) {
         await selectCompany(response.companies[0].id);
+      } else {
+        setCompany(response.company);
       }
       
       return response;
@@ -62,6 +69,8 @@ export const AuthProvider = ({ children }) => {
   const register = async (email, password) => {
     try {
       const response = await authService.register(email, password);
+      setUser(response.user);
+      setCompanies(response.companies || []);
       return response;
     } catch (error) {
       throw error;
@@ -76,7 +85,6 @@ export const AuthProvider = ({ children }) => {
       setCompanies([]);
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
-      // Mesmo com erro, limpa o estado local
       setUser(null);
       setCompany(null);
       setCompanies([]);
@@ -111,4 +119,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-

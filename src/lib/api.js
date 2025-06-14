@@ -1,3 +1,4 @@
+// src/lib/api.js
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -5,18 +6,26 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000
 // Configuração do axios
 const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true, // Para enviar cookies de sessão
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Interceptor para adicionar o token JWT
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 // Interceptor para tratar erros globalmente
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Redirecionar para login se não autenticado
+    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+      localStorage.removeItem('token'); // Remove token inválido
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -27,15 +36,22 @@ api.interceptors.response.use(
 export const authService = {
   login: async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token); // Armazena o token
+    }
     return response.data;
   },
 
   register: async (email, password) => {
     const response = await api.post('/auth/register', { email, password });
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+    }
     return response.data;
   },
 
   logout: async () => {
+    localStorage.removeItem('token'); // Remove o token ao fazer logout
     const response = await api.post('/auth/logout');
     return response.data;
   },
@@ -119,4 +135,3 @@ export const catalogService = {
 };
 
 export default api;
-
