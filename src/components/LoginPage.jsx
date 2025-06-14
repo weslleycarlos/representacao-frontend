@@ -1,138 +1,94 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, LogIn, UserPlus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 
 const LoginPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const { login, user, loading: authLoading } = useAuth(); // Renomeie 'loading' para evitar conflito
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login, register } = useAuth();
+  // Efeito para redirecionar se o usuário já estiver logado
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
-    setSuccess('');
-
+    setIsSubmitting(true);
     try {
-      if (isLogin) {
-        await login(email, password);
-      } else {
-        await register(email, password);
-        setSuccess('Usuário criado com sucesso! Faça login para continuar.');
-        setIsLogin(true);
-        setPassword('');
-      }
-    } catch (error) {
-      setError(error.response?.data?.error || 'Erro ao processar solicitação');
-    } finally {
-      setLoading(false);
+      await login(email, password);
+      // O redirecionamento após o login será tratado pelo useEffect acima
+    } catch (err) {
+      setError('Falha no login. Verifique seu e-mail e senha.');
+      setIsSubmitting(false);
     }
   };
 
+  // Se a verificação inicial de autenticação ainda está acontecendo, mostre um spinner.
+  // ISSO É A CHAVE PARA QUEBRAR O LOOP.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // O usuário definitivo não está logado e o carregamento terminou, mostre o formulário.
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            {isLogin ? 'Entrar' : 'Criar Conta'}
-          </CardTitle>
-          <CardDescription className="text-center">
-            {isLogin 
-              ? 'Entre com suas credenciais para acessar o sistema'
-              : 'Crie uma nova conta para começar'
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Sua senha"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {success && (
-              <Alert>
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : isLogin ? (
-                <LogIn className="mr-2 h-4 w-4" />
-              ) : (
-                <UserPlus className="mr-2 h-4 w-4" />
-              )}
-              {loading ? 'Processando...' : isLogin ? 'Entrar' : 'Criar Conta'}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-center">
-            <Button
-              variant="link"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError('');
-                setSuccess('');
-              }}
-              disabled={loading}
-            >
-              {isLogin 
-                ? 'Não tem uma conta? Criar conta'
-                : 'Já tem uma conta? Fazer login'
-              }
-            </Button>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Login</h2>
+        <form onSubmit={handleSubmit}>
+          {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
+              Email
+            </label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
           </div>
-
-          {isLogin && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-700 font-medium">Dados de teste:</p>
-              <p className="text-xs text-blue-600">Email: admin@exemplo.com</p>
-              <p className="text-xs text-blue-600">Senha: 123456</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          <div className="mb-6">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+              Senha
+            </label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full disabled:bg-blue-300 flex items-center justify-center"
+            >
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Entrar
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
 
 export default LoginPage;
-
