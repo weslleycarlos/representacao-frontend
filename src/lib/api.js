@@ -1,17 +1,16 @@
-// src/lib/api.js
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
-// Configuração do axios
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+  withCredentials: true,  // Isso envia cookies
   headers: {
     'Content-Type': 'application/json',
-  },
+    'Accept': 'application/json'
+  }
 });
 
-// Interceptor para adicionar o token JWT
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -20,25 +19,28 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor para tratar erros globalmente
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
-      localStorage.removeItem('token'); // Remove token inválido
+      localStorage.removeItem('token');
       window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
 
-// Serviços de autenticação
 export const authService = {
   login: async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
     if (response.data.token) {
-      localStorage.setItem('token', response.data.token); // Armazena o token
+      localStorage.setItem('token', response.data.token);
     }
+    return response.data;
+  },
+
+  getCurrentUser: async () => {
+    const response = await api.get('/auth/me');
     return response.data;
   },
 
@@ -51,23 +53,39 @@ export const authService = {
   },
 
   logout: async () => {
-    localStorage.removeItem('token'); // Remove o token ao fazer logout
+    localStorage.removeItem('token');
     const response = await api.post('/auth/logout');
     return response.data;
   },
 
-  selectCompany: async (companyId) => {
-    const response = await api.post('/auth/select-company', { company_id: companyId });
+selectCompany: async (companyId) => {
+  try {
+    // Converta explicitamente para string e use o formato exato que o backend espera
+    const payload = {
+      company_id: String(companyId) // Garante que é string
+    };
+    
+    console.log('Enviando payload:', payload); // Log para debug
+    
+    const response = await api.post('/auth/select-company', {
+      company_id: String(companyId)  // Garante que é string
+    });
+    
     return response.data;
-  },
+  } catch (error) {
+    console.error('Detalhes do erro:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      payload: error.config?.data,
+      status: error.response?.status,
+      responseData: error.response?.data
+    });
+    throw error;
+  }
+}
+}; 
 
-  getCurrentUser: async () => {
-    const response = await api.get('/auth/me');
-    return response.data;
-  },
-};
 
-// Serviços do dashboard
 export const dashboardService = {
   getMetrics: async () => {
     const response = await api.get('/dashboard/metrics');
@@ -77,18 +95,16 @@ export const dashboardService = {
   getPendingOrdersCount: async () => {
     const response = await api.get('/dashboard/pending-orders-count');
     return response.data;
-  },
+  }
 };
 
-// Serviços de CNPJ
 export const cnpjService = {
   consultar: async (cnpj) => {
     const response = await api.post('/cnpj/consultar', { cnpj });
     return response.data;
-  },
+  }
 };
 
-// Serviços de pedidos
 export const ordersService = {
   getOrders: async () => {
     const response = await api.get('/orders/');
@@ -108,10 +124,9 @@ export const ordersService = {
   syncOrders: async (orders) => {
     const response = await api.post('/orders/sync', { orders });
     return response.data;
-  },
+  }
 };
 
-// Serviços do catálogo
 export const catalogService = {
   getProducts: async () => {
     const response = await api.get('/catalog/products');
@@ -131,7 +146,7 @@ export const catalogService = {
   createPaymentMethod: async (paymentMethodData) => {
     const response = await api.post('/catalog/payment-methods', paymentMethodData);
     return response.data;
-  },
+  }
 };
 
 export default api;

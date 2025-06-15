@@ -1,4 +1,3 @@
-// src/contexts/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../lib/api';
 
@@ -18,53 +17,56 @@ export const AuthProvider = ({ children }) => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Verifica se o usuário está logado ao carregar a aplicação
   useEffect(() => {
     checkAuth();
   }, []);
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setLoading(false);
-      return;
+  const token = localStorage.getItem('token');
+  if (!token) {
+    setLoading(false);
+    return;
+  }
+  try {
+    const response = await authService.getCurrentUser(); // Agora vai funcionar
+    setUser(response.user);
+    setCompany(response.company || null);
+    setCompanies(response.companies || []);
+  } catch (error) {
+    console.error('Erro ao verificar autenticação:', error);
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
     }
-    try {
-      const response = await authService.getCurrentUser();
-      setUser(response.user);
-      setCompany(response.company);
-      setCompanies(response.companies || []);
-    } catch (error) {
-      console.error('Erro ao verificar autenticação:', error);
-      if (error.response?.status === 401) {
-        localStorage.removeItem('token'); // Remove token inválido
-      }
-      setUser(null);
-      setCompany(null);
-      setCompanies([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setUser(null);
+    setCompany(null);
+    setCompanies([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const login = async (email, password) => {
-    try {
-      const response = await authService.login(email, password);
-      setUser(response.user);
-      setCompanies(response.companies || []);
-      
-      // Se há apenas uma empresa, seleciona automaticamente
-      if (response.companies && response.companies.length === 1) {
+ const login = async (email, password) => {
+  try {
+    const response = await authService.login(email, password);
+    setUser(response.user);
+    setCompanies(response.companies || []);
+    
+    // Modifique esta lógica
+    if (response.companies && response.companies.length > 0) {
+      if (response.companies.length === 1) {
+        // Aguarde a seleção da empresa antes de continuar
         await selectCompany(response.companies[0].id);
-      } else {
-        setCompany(response.company);
       }
-      
-      return response;
-    } catch (error) {
-      throw error;
+      // Se tiver mais de uma, o usuário precisa selecionar
+    } else {
+      setCompany(null); // Nenhuma empresa disponível
     }
-  };
+    
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
 
   const register = async (email, password) => {
     try {
@@ -91,15 +93,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const selectCompany = async (companyId) => {
-    try {
-      const response = await authService.selectCompany(companyId);
-      setCompany(response.company);
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  };
+const selectCompany = async (companyId) => {
+  try {
+    console.log('Tentando selecionar empresa:', {
+      id: companyId,
+      tipo: typeof companyId
+    });
+    
+    const response = await authService.selectCompany(String(companyId));
+    setCompany(response.company);
+    return response;
+  } catch (error) {
+    console.error('Falha completa:', {
+      erro: error.message,
+      resposta: error.response?.data,
+      stack: error.stack
+    });
+    throw error;
+  }
+};
 
   const value = {
     user,
@@ -114,7 +126,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user,
+      company,
+      companies,
+      loading,
+      login,
+      register,
+      logout,
+      selectCompany,
+      checkAuth,
+    }}>
       {children}
     </AuthContext.Provider>
   );
