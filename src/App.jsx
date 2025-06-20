@@ -9,7 +9,9 @@ import OrderDetailPage from './components/OrderDetailPage';
 import CatalogPage from './components/CatalogPage';
 import CompaniesPage from './components/CompaniesPage';
 import ClientsPage from './components/ClientsPage';
-import ClientDetailPage from './components/ClientDetailPage'; 
+import ClientDetailPage from './components/ClientDetailPage';
+import UsersPage from './components/UsersPage';
+import UserDetailPage from './components/UserDetailPage';
 import { useServiceWorker } from './hooks/useOffline';
 import { Loader2 } from 'lucide-react';
 import './App.css';
@@ -35,6 +37,8 @@ const ProtectedRoutes = () => {
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/clients/:clientId" element={<ClientDetailPage />} />
             <Route path="/orders/:orderId" element={<OrderDetailPage />} />
+            <Route path="/users" element={<UsersPage />} /> 
+            <Route path="/users/:userId" element={<UserDetailPage />} />
           </>
         )}
         

@@ -12,6 +12,7 @@ import {
   X,
   BookOpen,
   Users,
+  UsersRound,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ const Layout = ({ children }) => {
     { name: 'Catálogo', icon: BookOpen, to: '/catalog', adminOnly: true },
     { name: 'Empresas', icon: Building2, to: '/companies', adminOnly: true },
     { name: 'Clientes', icon: Users, to: '/clients', adminOnly: true },
+    { name: 'Usuários', icon: UsersRound, to: '/users', adminOnly: true },
   ];
 
   const navigation = allNavigation.filter(item => !item.adminOnly || isAdmin);
