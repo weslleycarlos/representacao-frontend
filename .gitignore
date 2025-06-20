@@ -1,2 +1,28 @@
+# Arquivos de log e cache
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+# Cache de dependências do pnpm
+.pnpm-store/
+
+# Dependências do Node.js (MUITO IMPORTANTE)
 /node_modules
+
+# Pasta de build do Vite
+/dist
+
+# Arquivos de ambiente local (NUNCA ENVIE PARA O GITHUB)
 .env
+.env.local
+.env.*.local
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos do editor de código (VS Code)
+.vscode/
