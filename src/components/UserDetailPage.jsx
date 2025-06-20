@@ -1,12 +1,11 @@
-// Crie este novo arquivo: src/components/UserDetailPage.jsx
-
+import { Separator } from '@/components/ui/separator';
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Trash2} from 'lucide-react';
 
 const UserDetailPage = () => {
     const { userId } = useParams();
