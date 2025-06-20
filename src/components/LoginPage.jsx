@@ -121,13 +121,7 @@ const LoginPage = () => {
             </Button>
           </div>
 
-          {isLogin && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-700 font-medium">Dados de teste:</p>
-              <p className="text-xs text-blue-600">Email: admin@exemplo.com</p>
-              <p className="text-xs text-blue-600">Senha: 123456</p>
-            </div>
-          )}
+          
         </CardContent>
       </Card>
     </div>
