@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, Clock, Search, ShoppingCart, Loader2, WifiOff, Trash2, ArrowRight, ArrowLeft, CheckCircle2
 } from 'lucide-react';
@@ -66,7 +67,7 @@ const OrderItemRow = ({ item, index, onUpdate, onRemove }) => {
             {item.sizes && item.sizes.length > 0 && (
                 <div className="space-y-1">
                     <Label>Grade de Tamanhos</Label>
-                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2"> {/* Ajustado para melhor distribuição */}
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                         {item.sizes.map(size => (
                             <div key={size} className="space-y-1 text-center">
                                 <Label className="text-xs font-normal">{size}</Label>
@@ -94,7 +95,9 @@ const OrdersPage = () => {
     
     const [currentStep, setCurrentStep] = useState(1);
     const [orderForm, setOrderForm] = useState({ client: null, payment_method_id: '', discount_percentage: 0, observations: '', items: [] });
-    const [clientSearch, setClientSearch] = useState({ query: '', loading: false, error: '' });
+    const [clientCnpjSearch, setClientCnpjSearch] = useState({ query: '', loading: false, error: '' });
+    const [clientNameSearch, setClientNameSearch] = useState({ query: '', results: [], loading: false });
+
     const navigate = useNavigate();
 
     const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -130,30 +133,73 @@ const OrdersPage = () => {
         }
     };
     
-    const handleClientSearch = async () => {
-        if (!clientSearch.query) return;
-        const sanitizedCnpj = clientSearch.query.replace(/[.\-/]/g, '');
-        setClientSearch({ ...clientSearch, loading: true, error: '' });
+    useEffect(() => {
+        if (clientNameSearch.query.length < 3) {
+            setClientNameSearch(prev => ({ ...prev, results: [] }));
+            return;
+        }
+
+        const fetchClients = async () => {
+            setClientNameSearch(prev => ({ ...prev, loading: true }));
+            try {
+                const response = await api.get(`/clients/search?q=${clientNameSearch.query}`);
+                setClientNameSearch(prev => ({ ...prev, results: response.data, loading: false }));
+            } catch (error) {
+                console.error("Erro ao buscar clientes por nome", error);
+                setClientNameSearch(prev => ({ ...prev, loading: false, results: [] }));
+            }
+        };
+
+        const timerId = setTimeout(() => {
+            fetchClients();
+        }, 500);
+
+        return () => clearTimeout(timerId);
+    }, [clientNameSearch.query]);
+
+    const handleClientCnpjSearch = async () => {
+        if (!clientCnpjSearch.query) return;
+        const sanitizedCnpj = clientCnpjSearch.query.replace(/[.\-/]/g, '');
+        setClientCnpjSearch({ ...clientCnpjSearch, loading: true, error: '' });
         try {
             const response = await api.get(`/clients/by_cnpj/${sanitizedCnpj}`);
             setOrderForm({ ...orderForm, client: response.data });
         } catch (err) {
             if (err.response && err.response.status === 404) {
                 try {
-                    const wsResult = await cnpjService.consultar(clientSearch.query);
-                    const newClientData = { id: null, cnpj: wsResult.cnpj, razao_social: wsResult.razao_social, nome_fantasia: wsResult.nome_fantasia, phone: wsResult.telefone, email: wsResult.email, street: wsResult.logradouro, number: wsResult.numero, complement: wsResult.complemento, neighborhood: wsResult.bairro, city: wsResult.municipio, state: wsResult.uf, zip_code: wsResult.cep };
+                    const wsResult = await cnpjService.consultar(clientCnpjSearch.query);
+                    const newClientData = { 
+                        id: null, 
+                        cnpj: wsResult.cnpj, 
+                        razao_social: wsResult.razao_social, 
+                        nome_fantasia: wsResult.nome_fantasia, 
+                        phone: wsResult.telefone, 
+                        email: wsResult.email, 
+                        street: wsResult.logradouro, 
+                        number: wsResult.numero, 
+                        complement: wsResult.complemento, 
+                        neighborhood: wsResult.bairro, 
+                        city: wsResult.municipio, 
+                        state: wsResult.uf, 
+                        zip_code: wsResult.cep 
+                    };
                     setOrderForm({ ...orderForm, client: newClientData });
                 } catch (wsErr) {
-                    setClientSearch({ ...clientSearch, loading: false, error: 'CNPJ não encontrado.' });
+                    setClientCnpjSearch({ ...clientCnpjSearch, loading: false, error: 'CNPJ não encontrado.' });
                 }
             } else {
-                setClientSearch({ ...clientSearch, loading: false, error: 'Erro ao buscar cliente.' });
+                setClientCnpjSearch({ ...clientCnpjSearch, loading: false, error: 'Erro ao buscar cliente.' });
             }
         } finally {
-            setClientSearch(prev => ({...prev, loading: false}));
+            setClientCnpjSearch(prev => ({...prev, loading: false}));
         }
     };
     
+    const handleSelectClient = (client) => {
+        setOrderForm(prev => ({...prev, client}));
+        setClientNameSearch({ query: '', results: [], loading: false });
+    };
+
     const handleSaveOrder = async () => {
         let clientToUse = orderForm.client;
         if (!clientToUse) { alert("Nenhum cliente selecionado!"); return; }
@@ -162,7 +208,15 @@ const OrdersPage = () => {
                 const newClientResponse = await api.post('/clients', clientToUse);
                 clientToUse = newClientResponse.data;
             }
-            const finalOrderData = { client_id: clientToUse.id, client_cnpj: clientToUse.cnpj, client_razao_social: (clientToUse.razao_social || clientToUse.nome), payment_method_id: orderForm.payment_method_id, discount_percentage: orderForm.discount_percentage, observations: orderForm.observations, items: orderForm.items };
+            const finalOrderData = { 
+                client_id: clientToUse.id, 
+                client_cnpj: clientToUse.cnpj, 
+                client_razao_social: (clientToUse.razao_social || clientToUse.nome), 
+                payment_method_id: orderForm.payment_method_id, 
+                discount_percentage: orderForm.discount_percentage, 
+                observations: orderForm.observations, 
+                items: orderForm.items 
+            };
             await ordersService.createOrder(finalOrderData);
             alert('Pedido criado com sucesso!');
             handleDialogClose();
@@ -175,7 +229,8 @@ const OrdersPage = () => {
     const handleDialogClose = () => {
         setTimeout(() => {
             setOrderForm({ client: null, payment_method_id: '', discount_percentage: 0, observations: '', items: [] });
-            setClientSearch({ query: '', loading: false, error: '' });
+            setClientCnpjSearch({ query: '', loading: false, error: '' });
+            setClientNameSearch({ query: '', results: [], loading: false });
             setCurrentStep(1);
         }, 300);
         setShowOrderDialog(false);
@@ -195,7 +250,7 @@ const OrdersPage = () => {
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto"> {/* Centraliza e define largura máxima */}
+        <div className="space-y-6 max-w-7xl mx-auto">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold">Pedidos</h1>
@@ -203,20 +258,91 @@ const OrdersPage = () => {
                 </div>
                 <Dialog open={showOrderDialog} onOpenChange={setShowOrderDialog}>
                     <DialogTrigger asChild>
-                        <Button onClick={() => setShowOrderDialog(true)}><Plus className="mr-2 h-4 w-4" /> Novo Pedido</Button>
+                        <Button><Plus className="mr-2 h-4 w-4" /> Novo Pedido</Button>
                     </DialogTrigger>
-                    <DialogContent className="w-full max-w-[95vw] sm:max-w-3xl md:max-w-4xl lg:max-w-5xl h-[90vh] flex flex-col p-0 mx-auto"> {/* Ajusta largura do diálogo */}
+                    <DialogContent className="w-full max-w-[95vw] sm:max-w-3xl md:max-w-4xl lg:max-w-5xl h-[90vh] flex flex-col p-0 mx-auto">
                         <DialogHeader className="p-6 pb-4 border-b">
                             <DialogTitle>Novo Pedido - Passo {currentStep} de 4</DialogTitle>
                         </DialogHeader>
                         <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
                             {currentStep === 1 && (
                                 <Card>
-                                    <CardHeader><CardTitle>Passo 1: Selecionar Cliente</CardTitle><CardDescription>Busque pelo CNPJ para encontrar um cliente existente ou cadastrar um novo.</CardDescription></CardHeader>
+                                    <CardHeader>
+                                        <CardTitle>Passo 1: Selecionar Cliente</CardTitle>
+                                        <CardDescription>Busque por CNPJ para novos clientes ou por nome para clientes existentes.</CardDescription>
+                                    </CardHeader>
                                     <CardContent className="space-y-4">
-                                        <div className="flex space-x-2"><Input value={clientSearch.query} onChange={e => setClientSearch({ ...clientSearch, query: e.target.value })} placeholder="Digite o CNPJ..." /><Button type="button" size="icon" onClick={handleClientSearch} disabled={clientSearch.loading}>{clientSearch.loading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}</Button></div>
-                                        {clientSearch.error && <p className="text-sm text-red-500">{clientSearch.error}</p>}
-                                        {orderForm.client && (<Card className="mt-4 bg-muted/50"><CardHeader><CardTitle className="flex items-center text-lg">{orderForm.client.id ? <CheckCircle2 className="h-5 w-5 mr-2 text-green-600"/> : <Plus className="h-5 w-5 mr-2 text-blue-600"/>} Cliente {orderForm.client.id ? 'Encontrado' : 'a ser Criado'}</CardTitle></CardHeader><CardContent className="text-sm space-y-2"><div><strong>Razão Social:</strong> {orderForm.client.razao_social || orderForm.client.nome}</div><div><strong>Nome Fantasia:</strong> {orderForm.client.nome_fantasia || 'N/A'}</div><div><strong>CNPJ:</strong> {orderForm.client.cnpj}</div><div><strong>Email:</strong> {orderForm.client.email || 'N/A'}</div><div><strong>Telefone:</strong> {orderForm.client.phone || 'N/A'}</div><Separator/><p className="font-medium pt-2">Endereço Principal:</p><p className="text-muted-foreground">{orderForm.client.street}, {orderForm.client.number} - {orderForm.client.neighborhood}, {orderForm.client.city} - {orderForm.client.state}</p></CardContent></Card>)}
+                                        <Tabs defaultValue="cnpj">
+                                            <TabsList className="grid w-full grid-cols-2">
+                                                <TabsTrigger value="cnpj">Buscar por CNPJ</TabsTrigger>
+                                                <TabsTrigger value="nome">Buscar por Nome</TabsTrigger>
+                                            </TabsList>
+                                            
+                                            <TabsContent value="cnpj">
+                                                <div className="flex space-x-2">
+                                                    <Input 
+                                                        value={clientCnpjSearch.query} 
+                                                        onChange={e => setClientCnpjSearch({ ...clientCnpjSearch, query: e.target.value })} 
+                                                        placeholder="Digite o CNPJ..."
+                                                    />
+                                                    <Button 
+                                                        type="button" 
+                                                        size="icon" 
+                                                        onClick={handleClientCnpjSearch} 
+                                                        disabled={clientCnpjSearch.loading}
+                                                    >
+                                                        {clientCnpjSearch.loading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}
+                                                    </Button>
+                                                </div>
+                                                {clientCnpjSearch.error && <p className="text-sm text-red-500">{clientCnpjSearch.error}</p>}
+                                            </TabsContent>
+
+                                            <TabsContent value="nome">
+                                                <div className="relative">
+                                                    <Input 
+                                                        value={clientNameSearch.query} 
+                                                        onChange={e => setClientNameSearch({ ...clientNameSearch, query: e.target.value })} 
+                                                        placeholder="Digite o nome ou razão social (mín. 3 letras)"
+                                                    />
+                                                    {clientNameSearch.loading && <Loader2 className="absolute right-3 top-2 h-4 w-4 animate-spin"/>}
+                                                </div>
+                                                {clientNameSearch.results.length > 0 && (
+                                                    <div className="mt-2 border rounded-md max-h-40 overflow-y-auto">
+                                                        {clientNameSearch.results.map(client => (
+                                                            <div 
+                                                                key={client.id} 
+                                                                onClick={() => handleSelectClient(client)} 
+                                                                className="p-2 hover:bg-muted cursor-pointer text-sm"
+                                                            >
+                                                                <p className="font-medium">{client.razao_social}</p>
+                                                                <p className="text-xs text-muted-foreground">{client.cnpj}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </TabsContent>
+                                        </Tabs>
+
+                                        {orderForm.client && (
+                                            <Card className="mt-4 bg-muted/50">
+                                                <CardHeader>
+                                                    <CardTitle className="flex items-center text-lg">
+                                                        {orderForm.client.id ? <CheckCircle2 className="h-5 w-5 mr-2 text-green-600"/> : <Plus className="h-5 w-5 mr-2 text-blue-600"/>}
+                                                        Cliente {orderForm.client.id ? 'Encontrado' : 'a ser Criado'}
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="text-sm space-y-2">
+                                                    <div><strong>Razão Social:</strong> {orderForm.client.razao_social || orderForm.client.nome}</div>
+                                                    <div><strong>Nome Fantasia:</strong> {orderForm.client.nome_fantasia || 'N/A'}</div>
+                                                    <div><strong>CNPJ:</strong> {orderForm.client.cnpj}</div>
+                                                    <div><strong>Email:</strong> {orderForm.client.email || 'N/A'}</div>
+                                                    <div><strong>Telefone:</strong> {orderForm.client.phone || 'N/A'}</div>
+                                                    <Separator/>
+                                                    <p className="font-medium pt-2">Endereço Principal:</p>
+                                                    <p className="text-muted-foreground">{orderForm.client.street}, {orderForm.client.number} - {orderForm.client.neighborhood}, {orderForm.client.city} - {orderForm.client.state}</p>
+                                                </CardContent>
+                                            </Card>
+                                        )}
                                     </CardContent>
                                 </Card>
                             )}
@@ -278,16 +404,28 @@ const OrdersPage = () => {
                                 </div>
                             )}
                         </div>
+
+                        {/* Botões de Navegação do Wizard */}
                         <div className="p-6 pt-4 border-t flex justify-between">
-                            <Button type="button" variant="ghost" onClick={() => (currentStep === 1 ? handleDialogClose() : setCurrentStep(currentStep - 1))}>
+                            <Button 
+                                type="button" 
+                                variant="ghost" 
+                                onClick={() => (currentStep === 1 ? handleDialogClose() : setCurrentStep(currentStep - 1))}
+                            >
                                 {currentStep === 1 ? 'Cancelar' : 'Voltar'}
                             </Button>
                             {currentStep < 4 ? (
-                                <Button type="button" onClick={() => setCurrentStep(currentStep + 1)} disabled={(currentStep === 1 && !orderForm.client) || (currentStep === 2 && orderForm.items.length === 0)}>
+                                <Button 
+                                    type="button" 
+                                    onClick={() => setCurrentStep(currentStep + 1)} 
+                                    disabled={(currentStep === 1 && !orderForm.client) || (currentStep === 2 && orderForm.items.length === 0)}
+                                >
                                     Avançar <ArrowRight className="h-4 w-4 ml-2"/>
                                 </Button>
                             ) : (
-                                <Button type="button" onClick={handleSaveOrder}>Salvar Pedido</Button>
+                                <Button type="button" onClick={handleSaveOrder}>
+                                    Salvar Pedido
+                                </Button>
                             )}
                         </div>
                     </DialogContent>
@@ -296,7 +434,7 @@ const OrdersPage = () => {
             
             <Separator />
             
-            <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 max-w-7xl mx-auto"> {/* Ajusta grid e centraliza */}
+            <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 max-w-7xl mx-auto">
                 <Card>
                     <CardHeader><CardTitle>Pedidos Sincronizados</CardTitle><CardDescription>Pedidos salvos no servidor</CardDescription></CardHeader>
                     <CardContent>
