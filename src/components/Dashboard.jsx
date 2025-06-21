@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Adicionado para navegação
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardService, cnpjService } from '../lib/api';
 import { getOfflineOrders } from '../lib/offline';
@@ -17,11 +18,12 @@ import {
   Search,
   Loader2,
   Building2,
-  WifiOff
+  WifiOff,
+  RefreshCw // Ícone para recarregar
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const [metrics, setMetrics] = useState(null);
+  const [metrics, setMetrics] = useState({ orders_today: { count: 0, variation: 0 }, total_value_30_days: { value: 0, variation: 0 }, latest_orders: [] });
   const [offlineOrdersCount, setOfflineOrdersCount] = useState(0);
   const [cnpjQuery, setCnpjQuery] = useState('');
   const [cnpjResult, setCnpjResult] = useState(null);
@@ -31,12 +33,12 @@ const Dashboard = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const { company } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadDashboardData();
     loadOfflineOrdersCount();
 
-    // Monitora status de conexão
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
@@ -72,9 +74,17 @@ const Dashboard = () => {
     }
   };
 
+  const validateCnpj = (cnpj) => {
+    const cnpjRegex = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$|^\d{14}$/;
+    return cnpjRegex.test(cnpj);
+  };
+
   const handleCnpjSearch = async (e) => {
     e.preventDefault();
-    if (!cnpjQuery.trim() || !isOnline) return;
+    if (!cnpjQuery.trim() || !isOnline || !validateCnpj(cnpjQuery)) {
+      setError('Por favor, insira um CNPJ válido');
+      return;
+    }
 
     setCnpjLoading(true);
     setCnpjResult(null);
@@ -121,7 +131,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -143,8 +153,25 @@ const Dashboard = () => {
               Offline
             </Badge>
           )}
+          {error && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadDashboardData}
+              disabled={loading || !isOnline}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Recarregar
+            </Button>
+          )}
         </div>
       </div>
+
+      {error && !cnpjResult && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -154,14 +181,8 @@ const Dashboard = () => {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {metrics?.orders_today?.count || 0}
-            </div>
-            {metrics?.orders_today?.variation !== undefined && (
-              <div className="mt-1">
-                {formatVariation(metrics.orders_today.variation)}
-              </div>
-            )}
+            <div className="text-2xl font-bold">{metrics.orders_today.count}</div>
+            <div className="mt-1">{formatVariation(metrics.orders_today.variation)}</div>
           </CardContent>
         </Card>
 
@@ -172,9 +193,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{offlineOrdersCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Salvos localmente
-            </p>
+            <p className="text-xs text-muted-foreground">Salvos localmente</p>
           </CardContent>
         </Card>
 
@@ -184,17 +203,8 @@ const Dashboard = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {metrics?.total_value_30_days?.value 
-                ? formatCurrency(metrics.total_value_30_days.value)
-                : 'R$ 0,00'
-              }
-            </div>
-            {metrics?.total_value_30_days?.variation !== undefined && (
-              <div className="mt-1">
-                {formatVariation(metrics.total_value_30_days.variation)}
-              </div>
-            )}
+            <div className="text-2xl font-bold">{formatCurrency(metrics.total_value_30_days.value)}</div>
+            <div className="mt-1">{formatVariation(metrics.total_value_30_days.variation)}</div>
           </CardContent>
         </Card>
 
@@ -204,9 +214,7 @@ const Dashboard = () => {
             <div className={`h-3 w-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {isOnline ? 'Online' : 'Offline'}
-            </div>
+            <div className="text-2xl font-bold">{isOnline ? 'Online' : 'Offline'}</div>
             <p className="text-xs text-muted-foreground">
               {isOnline ? 'Conectado à internet' : 'Modo offline ativo'}
             </p>
@@ -228,7 +236,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCnpjSearch} className="space-y-4">
-              <div className="flex space-x-2">
+              <div className={`flex space-x-2 ${!isOnline ? 'opacity-50' : ''}`}>
                 <Input
                   placeholder="00.000.000/0000-00"
                   value={cnpjQuery}
@@ -248,7 +256,7 @@ const Dashboard = () => {
                 </Button>
               </div>
 
-              {error && (
+              {error && cnpjResult === null && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
@@ -258,21 +266,13 @@ const Dashboard = () => {
                 <Card>
                   <CardContent className="pt-4">
                     <div className="space-y-2">
-                      <div>
-                        <span className="font-medium">CNPJ:</span> {cnpjResult.cnpj}
-                      </div>
-                      <div>
-                        <span className="font-medium">Razão Social:</span> {cnpjResult.razao_social}
-                      </div>
+                      <div><span className="font-medium">CNPJ:</span> {cnpjResult.cnpj}</div>
+                      <div><span className="font-medium">Razão Social:</span> {cnpjResult.razao_social}</div>
                       {cnpjResult.nome_fantasia && (
-                        <div>
-                          <span className="font-medium">Nome Fantasia:</span> {cnpjResult.nome_fantasia}
-                        </div>
+                        <div><span className="font-medium">Nome Fantasia:</span> {cnpjResult.nome_fantasia}</div>
                       )}
                       {cnpjResult.situacao && (
-                        <div>
-                          <span className="font-medium">Situação:</span> {cnpjResult.situacao}
-                        </div>
+                        <div><span className="font-medium">Situação:</span> {cnpjResult.situacao}</div>
                       )}
                     </div>
                   </CardContent>
@@ -286,15 +286,17 @@ const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Últimos Pedidos</CardTitle>
-            <CardDescription>
-              Os 5 pedidos mais recentes
-            </CardDescription>
+            <CardDescription>Os 5 pedidos mais recentes</CardDescription>
           </CardHeader>
           <CardContent>
-            {metrics?.latest_orders && metrics.latest_orders.length > 0 ? (
+            {metrics.latest_orders && metrics.latest_orders.length > 0 ? (
               <div className="space-y-3">
                 {metrics.latest_orders.map((order, index) => (
-                  <div key={order.id}>
+                  <div 
+                    key={order.id} 
+                    className="cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors"
+                    onClick={() => navigate(`/orders/${order.id}`)}
+                  >
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">#{order.id}</p>
@@ -318,9 +320,7 @@ const Dashboard = () => {
             ) : (
               <div className="text-center py-8">
                 <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  Nenhum pedido encontrado
-                </p>
+                <p className="text-muted-foreground">Nenhum pedido encontrado</p>
               </div>
             )}
           </CardContent>
@@ -331,4 +331,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-

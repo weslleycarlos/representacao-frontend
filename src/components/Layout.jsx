@@ -19,7 +19,7 @@ import {
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false); // Estado para menu colapsável
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const { user, company, logout } = useAuth();
 
   const isAdmin = user?.role === 'admin';
@@ -142,9 +142,9 @@ const Layout = ({ children }) => {
         </div>
       </div>
 
-      <div className={`flex flex-1 flex-col ${isCollapsed ? 'lg:pl-16' : 'lg:pl-64'} transition-all duration-300`}>
-        <div className="sticky top-0 z-40 bg-white shadow-sm border-b">
-          <div className="flex items-center justify-between h-16 px-4">
+      <div className="flex flex-1 flex-col">
+        <div className={`sticky top-0 z-40 bg-white shadow-sm border-b ${isCollapsed ? 'lg:pl-14' : 'lg:pl-60'} transition-all duration-300`}>
+          <div className="flex items-center justify-between h-16 px-2">
             <Button
               variant="ghost"
               size="sm"
@@ -159,7 +159,9 @@ const Layout = ({ children }) => {
           </div>
         </div>
 
-        <main className="p-4">{children}</main>
+        <main className={`px-2 py-4 ${isCollapsed ? 'lg:pl-14' : 'lg:pl-60'} transition-all duration-300`}>
+          {children}
+        </main>
       </div>
     </div>
   );
